@@ -1,0 +1,17 @@
+int analogToBatteryPercentage(int analogValue) {
+    // Define min and max ADC values
+    const int minADC = 680; // Corresponds to 3.33V
+    const int maxADC = 1023; // Corresponds to 5V
+    
+    // Calculate battery percentage
+    float batteryPercentage = ((float)(analogValue - minADC) / (maxADC - minADC)) * 100.0;
+    
+    // Ensure battery percentage is within 0-100%
+    if (batteryPercentage > 100.0) {
+        batteryPercentage = 100.0;
+    } else if (batteryPercentage < 0.0) {
+        batteryPercentage = 0.0;
+    }
+
+    return (int)batteryPercentage;
+}
