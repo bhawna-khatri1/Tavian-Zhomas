@@ -1,0 +1,171 @@
+#include <LiquidCrystal.h>
+
+// LCD setup
+LiquidCrystal lcd(13, 12, 11, 10, 9, 8);
+
+// Button and sensor pins
+#define MINUTES_BUTTON A0
+#define HOURS_BUTTON A1
+#define SET_BUTTON A2
+#define DISPLAY_SWITCH_BUTTON A4
+#define VIBRATION_POT A3
+
+// Time and settings
+int minutes = 0, hours = 0;
+bool setMode = false, showBattery = false;
+int vibrationIntensity = 0, storedVibrationIntensity = 0;
+
+// For change tracking
+int lastMinutes = -1, lastHours = -1, lastVibrationIntensity = -1;
+bool lastSetMode = false, lastShowBattery = false;
+
+// For button debouncing
+bool lastMinuteButton = HIGH;
+bool lastHourButton = HIGH;
+bool lastSetButton = HIGH;
+bool lastDisplaySwitchButton = HIGH;
+
+// Timer variables
+unsigned long previousMillis = 0;
+const unsigned long interval = 1000; // 1 second
+
+void setup() {
+    pinMode(MINUTES_BUTTON, INPUT_PULLUP);
+    pinMode(HOURS_BUTTON, INPUT_PULLUP);
+    pinMode(SET_BUTTON, INPUT_PULLUP);
+    pinMode(DISPLAY_SWITCH_BUTTON, INPUT_PULLUP);
+    lcd.begin(16, 2);
+    updateDisplay();
+}
+
+void loop() {
+    handleButtons();
+    handleVibrationInput();
+
+    if (setMode && (hours > 0 || minutes > 0)) {
+        runCountdown();
+    }
+
+    // Only update the display if something changed
+    if (minutes != lastMinutes || hours != lastHours || vibrationIntensity != lastVibrationIntensity || 
+        showBattery != lastShowBattery || setMode != lastSetMode) {
+
+        updateDisplay();
+        lastMinutes = minutes;
+        lastHours = hours;
+        lastVibrationIntensity = vibrationIntensity;
+        lastShowBattery = showBattery;
+        lastSetMode = setMode;
+    }
+}
+
+// Handle button state changes with debounce delay only on state change
+void handleButtons() {
+    bool minuteButton = digitalRead(MINUTES_BUTTON);
+    bool hourButton = digitalRead(HOURS_BUTTON);
+    bool setButton = digitalRead(SET_BUTTON);
+    bool displaySwitchButton = digitalRead(DISPLAY_SWITCH_BUTTON);
+
+    if (minuteButton == LOW && lastMinuteButton == HIGH) {
+        delay(50);
+        if (digitalRead(MINUTES_BUTTON) == LOW && !setMode) {
+            minutes = (minutes + 10) % 60;
+        }
+    }
+    lastMinuteButton = minuteButton;
+
+    if (hourButton == LOW && lastHourButton == HIGH) {
+        delay(50);
+        if (digitalRead(HOURS_BUTTON) == LOW && !setMode) {
+            hours = (hours + 1) % 13;
+        }
+    }
+    lastHourButton = hourButton;
+
+    if (setButton == LOW && lastSetButton == HIGH) {
+        delay(50);
+        if (digitalRead(SET_BUTTON) == LOW) {
+            setMode = !setMode;
+            if (setMode) {
+                storedVibrationIntensity = vibrationIntensity;
+            }
+        }
+    }
+    lastSetButton = setButton;
+
+    if (displaySwitchButton == LOW && lastDisplaySwitchButton == HIGH) {
+        delay(50);
+        if (digitalRead(DISPLAY_SWITCH_BUTTON) == LOW) {
+            showBattery = !showBattery;
+        }
+    }
+    lastDisplaySwitchButton = displaySwitchButton;
+}
+
+// Handle potentiometer input
+void handleVibrationInput() {
+    if (!setMode) {
+        int potValue = analogRead(VIBRATION_POT);
+        vibrationIntensity = map(potValue, 0, 1023, 0, 100);
+        storedVibrationIntensity = vibrationIntensity;
+    } else {
+        vibrationIntensity = storedVibrationIntensity;
+    }
+}
+
+// Update LCD
+void updateDisplay() {
+    lcd.clear();
+    if (showBattery) {
+        lcd.setCursor(0, 0);
+        lcd.print("Battery: ");
+        lcd.print(getBatteryPercentage());
+        lcd.print("%");
+
+        lcd.setCursor(0, 1);
+        lcd.print("Vibration: ");
+        lcd.print(vibrationIntensity);
+        lcd.print("%");
+    } else {
+        lcd.setCursor(4, 0);
+        lcd.print(hours < 10 ? "0" : "");
+        lcd.print(hours);
+        lcd.print(":");
+        lcd.print(minutes < 10 ? "0" : "");
+        lcd.print(minutes);
+
+        lcd.setCursor(0, 1);
+        lcd.print(setMode ? "SET MODE: LOCKED" : "SET MODE: OPEN  ");
+    }
+}
+
+// Simulated battery percentage
+int getBatteryPercentage() {
+    return 75; // Placeholder
+}
+
+// Countdown logic (non-blocking)
+void runCountdown() {
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= interval) {
+        previousMillis = currentMillis;
+
+        if (minutes == 0 && hours > 0) {
+            hours--;
+            minutes = 59;
+        } else if (minutes > 0) {
+            minutes--;
+        }
+
+        if (minutes == 0 && hours == 0) {
+            // Countdown complete – trigger vibration
+            triggerVibration();
+        }
+    }
+}
+
+void triggerVibration() {
+    // Replace with real vibration trigger
+    lcd.setCursor(0, 1);
+    lcd.print("!!! VIBRATE !!!     ");
+}
